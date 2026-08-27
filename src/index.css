@@ -1,0 +1,365 @@
+@import url('https://cdn.msar.me/fonts/bangla/font.css'); /* 👈 সকল @import উপরে নিয়ে আসা হয়েছে */
+@import "tailwindcss";
+
+/* ── Design System: Tailwind v4 CSS Theme ──────────────────────────────── */
+@theme {
+  --color-border-light: #E2E8F0;
+  --color-border-dark: #1E293B;
+  --color-background-light: #F8FAFC;
+  --color-background-dark: #0F172A;
+  --color-surface-light: #FFFFFF;
+  --color-surface-dark: #1E293B;
+  --color-text-primary-light: #0F172A;
+  --color-text-primary-dark: #F8FAFC;
+  --color-text-secondary-light: #64748B;
+  --color-text-secondary-dark: #94A3B8;
+  --color-accent-brand: #3B82F6;
+  --color-accent-success: #10B981;
+  --color-accent-danger: #EF4444;
+  --color-accent-warning: #F59E0B; 
+
+  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Base Styles ───────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: var(--font-family-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-background-light);
+    color: var(--color-text-primary-light);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body {
+    background-color: var(--color-background-dark);
+    color: var(--color-text-primary-dark);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+/* ── Component Utilities ───────────────────────────────────────────────── */
+@layer components {
+  .card {
+    background-color: var(--color-surface-light);
+    border: 1px solid var(--color-border-light);
+    border-radius: 0.75rem;
+    transition: all 0.2s ease;
+  }
+
+  .dark .card {
+    background-color: var(--color-surface-dark);
+    border-color: var(--color-border-dark);
+  }
+
+  .card-hover:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    transform: translateY(-1px);
+  }
+
+  .dark .card-hover:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: 0.5rem;
+    background-color: var(--color-surface-light);
+    color: var(--color-text-primary-light);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dark .input-field {
+    border-color: var(--color-border-dark);
+    background-color: var(--color-surface-dark);
+    color: var(--color-text-primary-dark);
+  }
+
+  .input-field::placeholder {
+    color: var(--color-text-secondary-light);
+  }
+
+  .dark .input-field::placeholder {
+    color: var(--color-text-secondary-dark);
+  }
+
+  .input-field:focus {
+    border-color: var(--color-accent-brand);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #FFFFFF;
+    background-color: var(--color-accent-brand);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-primary:hover {
+    background-color: #2563EB;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-accent-danger);
+    background-color: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-accent-danger);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-primary-light);
+    background-color: var(--color-surface-light);
+    border: 1px solid var(--color-border-light);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dark .btn-secondary {
+    color: var(--color-text-primary-dark);
+    background-color: var(--color-surface-dark);
+    border-color: var(--color-border-dark);
+  }
+
+  .btn-secondary:hover {
+    background-color: #F1F5F9;
+  }
+
+  .dark .btn-secondary:hover {
+    background-color: #334155;
+  }
+
+  /* Status badge pills */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    white-space: nowrap;
+  }
+
+  .badge-ordered {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+  }
+  .dark .badge-ordered {
+    background-color: rgba(30, 58, 138, 0.3);
+    color: #60A5FA;
+  }
+
+  .badge-on-the-way {
+    background-color: #FEF3C7;
+    color: #92400E;
+  }
+  .dark .badge-on-the-way {
+    background-color: rgba(146, 64, 14, 0.3);
+    color: #FBBF24;
+  }
+
+  .badge-delivered {
+    background-color: #D1FAE5;
+    color: #065F46;
+  }
+  .dark .badge-delivered {
+    background-color: rgba(6, 95, 70, 0.3);
+    color: #34D399;
+  }
+
+  /* Sidebar */
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary-light);
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .dark .sidebar-link {
+    color: var(--color-text-secondary-dark);
+  }
+
+  .sidebar-link:hover {
+    background-color: #F1F5F9;
+    color: var(--color-text-primary-light);
+  }
+
+  .dark .sidebar-link:hover {
+    background-color: rgba(51, 65, 85, 0.5);
+    color: var(--color-text-primary-dark);
+  }
+
+  .sidebar-link.active {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: var(--color-accent-brand);
+  }
+
+  .dark .sidebar-link.active {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60A5FA;
+  }
+
+  /* Select field */
+  .select-field {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: 0.5rem;
+    background-color: var(--color-surface-light);
+    color: var(--color-text-primary-light);
+    outline: none;
+    transition: border-color 0.15s ease;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  .dark .select-field {
+    border-color: var(--color-border-dark);
+    background-color: var(--color-surface-dark);
+    color: var(--color-text-primary-dark);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
+  .select-field:focus {
+    border-color: var(--color-accent-brand);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  /* Loading spinner */
+  .spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid var(--color-border-light);
+    border-top-color: var(--color-accent-brand);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  .dark .spinner {
+    border-color: var(--color-border-dark);
+    border-top-color: var(--color-accent-brand);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@media print {
+  /* 1. ব্রাউজারের ডিফল্ট হেডার-ফুটার (তারিখ, টাইটেল, URL) মুছে ফেলার জন্য */
+  @page {
+    size: A4;
+    margin: 0; /* 👈 এটি ব্রাউজারের তারিখ ও টাইটেল হাইড করে দিবে */
+  }
+
+  /* 2. পেজের কন্টেন্ট যেন একদম সীমানায় না লেগে থাকে, তাই প্যাডিং দিন */
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    padding: 15mm !important; /* 👈 পেজের চারপাশে মার্জিনের কাজ করবে */
+  }
+
+  /* 3. নো-প্রিন্ট ক্লাসের পাশাপাশি সাধারণ হেডার/সাইডবার অটো-হাইড করার জন্য */
+  .no-print,
+  header,
+  nav,
+  aside,
+  .navbar,
+  .sidebar {
+    display: none !important;
+  }
+}
