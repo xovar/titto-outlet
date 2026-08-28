@@ -46,23 +46,25 @@ export default function LockScreen() {
         throw new Error(data.message || "লগইন করতে সমস্যা হয়েছে!");
       }
 
-      // 🎯 ৪. Manager এবং Admin উভয়কেই অনুমতি দেওয়া হলো
-      if (data.user.role !== "manager" && data.user.role !== "admin") {
-        throw new Error("আপনার এই POS প্যানেলে লগইন করার অনুমতি নেই!");
+      // 🛑 ৪. শুধুমাত্র Manager রোল ভ্যালিডেশন (Admin হলেও এই প্যানেলে ঢুকতে পারবে না)
+      if (data.user.role !== "manager") {
+        throw new Error(
+          "অ্যাক্সেস ডিনাইড! শুধুমাত্র আউটলেট ম্যানেজাররা এই POS প্যানেলে লগইন করতে পারবেন।"
+        );
       }
 
-      // 🎯 ৫. ইউজারের তথ্য সেভ করা
+      // 🎯 ৫. আউটলেট এবং ম্যানেজারের সমস্ত তথ্য সঠিকভাবে ফিল্টার করে তৈরি করা
       const loggedInUserInfo = {
         id: data.user.id,
         firebaseUid: user.uid,
-        name: data.user.name || user.displayName || "POS User",
+        name: data.user.name || user.displayName || "Manager",
         email: data.user.email || user.email,
-        role: data.user.role,
+        role: "manager",
         outletId: data.user.outlet_id || data.user.outletId || null,
-        outletName: data.user.outlet_name || data.user.outletName || null,
+        outletName: data.user.outlet_name || data.user.outletName || "Assigned Outlet",
       };
 
-      // LocalStorage-এ ইউজার ডাটা সেভ
+      // LocalStorage-এ ম্যানেজারের সম্পূর্ণ ডাটা সেভ
       localStorage.setItem("pos_manager_user", JSON.stringify(loggedInUserInfo));
 
       // 🎯 ৬. POS ড্যাশবোর্ডে রিডাইরেক্ট
@@ -151,7 +153,7 @@ export default function LockScreen() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 bg-[#6b51b6] hover:bg-[#5b439f] active:bg-[#4d3788] text-white font-medium text-sm rounded-lg shadow-sm transition-colors duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-2.5 px-4 bg-[#6b51b6] hover:bg-[#5b439f] active:bg-[#4d3788] text-white font-medium text-sm rounded-lg shadow-sm transition-colors duration-200 cursor-pointer disabled:opacity-[#60%] disabled:cursor-not-allowed"
           >
             {loading ? "Verifying Access..." : "Log In to POS"}
           </button>
@@ -159,7 +161,7 @@ export default function LockScreen() {
       </div>
 
       <footer className="mt-8 text-center text-xs text-slate-400">
-        © 2026 Titto POS
+        © 2026 Titto POS Panel
       </footer>
     </div>
   );
