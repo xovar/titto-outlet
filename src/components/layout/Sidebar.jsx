@@ -18,10 +18,6 @@ import logo from "../../assets/titto.logo.png";
 // 🛍️ Order Sub Links
 const orderSubLinks = [
   { to: "/orders", label: "All Orders", icon: List },
-  { to: "/orders/add", label: "Create Order", icon: PlusCircle },
-  { to: "/orders?status=pending", label: "Pending", icon: Clock },
-  { to: "/orders?status=shipped", label: "Shipped", icon: Truck },
-  { to: "/orders?status=delivered", label: "Delivered", icon: CheckCircle2 },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {

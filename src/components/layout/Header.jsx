@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sun, Moon, Menu, User, LogOut } from 'lucide-react';
+import { Sun, Moon, Menu, User, LogOut, Store } from 'lucide-react';
 import { toggleTheme } from '../../store/slices/themeSlice';
-import { auth } from '../../config/firebase'; // 👈 আপনার ফায়ারবেস কনফিগ ফাইল পাথ নিশ্চিত করুন
+import { auth } from '../../config/firebase'; 
 import { signOut } from 'firebase/auth';
 
 const routeLabels = {
@@ -21,13 +21,21 @@ export default function Header({ onMenuToggle }) {
   const { darkMode } = useSelector((state) => state.theme);
   const location = useLocation();
 
+  // ⚡ LocalStorage থেকে ইউজার ডাটা রিড করা
+  const [user, setUser] = useState(() => {
+    const savedUser =
+      localStorage.getItem('admin_user') ||
+      localStorage.getItem('pos_manager_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   // ⚡ Dropdown State & Ref
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const breadcrumbs = routeLabels[location.pathname] || ['Dashboard'];
 
-  // ⚡ ড্রপডাউনের বাইরে ক্লিক করলে ড্রপডাউন বন্ধ করার লজিক
+  // ⚡ ড্রপডাউনের বাইরে ক্লিক করলে বন্ধ করার লজিক
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -45,7 +53,7 @@ export default function Header({ onMenuToggle }) {
       localStorage.clear();  // Local storage clear
       sessionStorage.clear();
       setIsDropdownOpen(false);
-      navigate('/login');    // Redirect to login page
+      navigate('/login', { replace: true }); // Redirect to login page
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -85,17 +93,7 @@ export default function Header({ onMenuToggle }) {
 
       {/* Right: dark mode + user profile dropdown */}
       <div className="flex items-center gap-3">
-        {/* for later version */}
-        {/* <button
-          id="dark-mode-toggle"
-          onClick={() => dispatch(toggleTheme())}
-          className="p-2 rounded-lg hover:bg-background-light dark:hover:bg-background-dark text-text-secondary-light dark:text-text-secondary-dark transition-colors"
-          title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-        </button> */}
-
-        {/* ⚡ User Profile Section with Dropdown */}
+        {/* ⚡ Dynamic User Profile Section */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -105,30 +103,40 @@ export default function Header({ onMenuToggle }) {
               <User size={16} className="text-accent-brand" />
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark leading-none">
-                Titto Admin
+              <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark leading-none capitalize">
+                {user?.name || 'User'}
               </p>
               <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark mt-0.5">
-                tittowebsiteadmin@gmail.com
+                {user?.email || 'user@titto.com.bd'}
               </p>
             </div>
           </button>
 
           {/* ⚡ Dropdown Menu */}
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-4 py-2 border-b border-border-light dark:border-border-dark sm:hidden">
-                <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                  Admin User
+            <div className="absolute right-0 mt-2 w-56 bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-border-light dark:border-border-dark py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+              {/* User Info inside Dropdown */}
+              <div className="px-4 py-2.5 border-b border-border-light dark:border-border-dark">
+                <p className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark capitalize">
+                  {user?.name || 'User Name'}
                 </p>
-                <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
-                  tittowebsiteadmin@gmail.com
+                <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate mt-0.5">
+                  {user?.email || 'email@example.com'}
                 </p>
+
+                {/* Outlet Name (If Available) */}
+                {user?.outletName && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium">
+                    <Store size={12} />
+                    <span>{user.outletName}</span>
+                  </div>
+                )}
               </div>
 
+              {/* Logout Button */}
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 transition-colors cursor-pointer"
+                className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 transition-colors cursor-pointer mt-1"
               >
                 <LogOut size={16} />
                 <span>Logout</span>

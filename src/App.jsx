@@ -10,7 +10,6 @@ import PosSystem from "./pages/POS/PosSystem"; // 👈 আপনার ফাই
 
 // 🛍️ Order Pages
 import OrderList from "./pages/orders/OrderList";
-import OrderDetails from "./pages/orders/OrderDetails";
 
 // Auth & LockScreen
 import LockScreen from "./pages/lockscreen/LockScreen";
@@ -33,7 +32,6 @@ export default function App() {
 
           {/* 🛒 Order Routes */}
           <Route path="orders" element={<OrderList />} />
-          <Route path="orders/:id" element={<OrderDetails />} />
         </Route>
       </Route>
 

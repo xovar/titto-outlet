@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchOrders, deleteOrder } from '../../store/slices/orderSlice';
-import EditOrderModal from './EditOrderModal';
+import { fetchOrders } from '../../store/slices/orderSlice';
+import OrderDetailsModal from './OrderDetailsModal';
 import {
   Search,
   Eye,
-  Edit,
-  Trash2,
   Clock,
   Truck,
   CheckCircle2,
@@ -29,52 +27,17 @@ export default function OrderList() {
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 🟢 Edit Modal State
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // Modal States
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🗑️ Custom Delete Modal State
-  const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
-
-  // Redux Store থেকে State নিয়ে আসা
+  // Redux Store
   const { items, pagination, loading, error } = useSelector((state) => state.orders);
 
-  // URL-এর status বা page পরিবর্তন হলে Redux Action Dispatch করা
   useEffect(() => {
     dispatch(fetchOrders({ page: currentPage, limit: 10, status: currentStatus }));
   }, [dispatch, currentStatus, currentPage]);
 
-  // 🗑️ Delete Modal ওপেন করার হ্যান্ডলার
-  const handleOpenDeleteModal = (id) => {
-    setDeleteModal({ show: true, id });
-  };
-
-  // 🗑️ Delete Modal ক্লোজ করার হ্যান্ডলার
-  const handleCloseDeleteModal = () => {
-    setDeleteModal({ show: false, id: null });
-  };
-
-  // 🗑️ কনফার্ম করার পর Redux Action Dispatch
-  const handleConfirmDelete = () => {
-    if (deleteModal.id) {
-      dispatch(deleteOrder(deleteModal.id));
-      handleCloseDeleteModal();
-    }
-  };
-
-  // ✏️ Edit Modal ওপেন করার হ্যান্ডলার
-  const handleEditClick = (order) => {
-    setSelectedOrder(order);
-    setIsEditModalOpen(true);
-  };
-
-  // 🔒 Edit Modal ক্লোজ করার হ্যান্ডলার
-  const handleCloseModal = () => {
-    setIsEditModalOpen(false);
-    setSelectedOrder(null);
-  };
-
-  // 📄 Page Change Handler
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination?.totalPages) {
       const newParams = new URLSearchParams(searchParams);
@@ -86,7 +49,6 @@ export default function OrderList() {
     }
   };
 
-  // 🔍 স্ট্যাটাস এবং সার্চ ফিল্টার
   const filteredOrders = (items || []).filter((order) => {
     const firstName = order.firstName || order.first_name || '';
     const lastName = order.lastName || order.last_name || '';
@@ -98,7 +60,11 @@ export default function OrderList() {
     return orderId.includes(search) || name.includes(search) || phone.includes(search);
   });
 
-  // 🎨 Status Badge Helper
+  const handleOpenModal = (order) => {
+    setSelectedOrder(order);
+    setIsModalOpen(true);
+  };
+
   const getStatusBadge = (status) => {
     const statusClasses = {
       pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
@@ -132,7 +98,7 @@ export default function OrderList() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      {/* 🟢 Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -142,15 +108,9 @@ export default function OrderList() {
             Manage and track all customer orders
           </p>
         </div>
-        <Link
-          to="/orders/add"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-accent-brand hover:opacity-90 text-white font-medium rounded-lg transition-all shadow-sm text-sm"
-        >
-          + Create New Order
-        </Link>
       </div>
 
-      {/* ⚠️ Redux Error Alert */}
+      {/* Error Alert */}
       {error && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2">
           <AlertCircle size={18} className="shrink-0" />
@@ -158,30 +118,26 @@ export default function OrderList() {
         </div>
       )}
 
-      {/* 📊 Status Tabs & Search */}
+      {/* Tabs & Search */}
       <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-border-light dark:border-border-dark space-y-4 shadow-sm">
-        {/* Status Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border-light dark:border-border-dark text-sm scrollbar-none">
-          {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() =>
-                  setSearchParams(tab === 'all' ? {} : { status: tab, page: '1' })
-                }
-                className={`px-3.5 py-1.5 rounded-lg font-medium capitalize transition-all whitespace-nowrap ${
-                  currentStatus === tab
-                    ? 'bg-accent-brand/10 text-accent-brand font-semibold'
-                    : 'text-text-secondary-light dark:text-text-secondary-dark hover:bg-background-light dark:hover:bg-background-dark'
-                }`}
-              >
-                {tab}
-              </button>
-            )
-          )}
+          {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() =>
+                setSearchParams(tab === 'all' ? {} : { status: tab, page: '1' })
+              }
+              className={`px-3.5 py-1.5 rounded-lg font-medium capitalize transition-all whitespace-nowrap ${
+                currentStatus === tab
+                  ? 'bg-accent-brand/10 text-accent-brand font-semibold'
+                  : 'text-text-secondary-light dark:text-text-secondary-dark hover:bg-background-light dark:hover:bg-background-dark'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        {/* Search & Refresh */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
             <Search
@@ -207,7 +163,7 @@ export default function OrderList() {
         </div>
       </div>
 
-      {/* 📋 Table */}
+      {/* Table */}
       <div className="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-12 text-center text-text-secondary-light dark:text-text-secondary-dark">
@@ -239,26 +195,32 @@ export default function OrderList() {
                     order.deliveryCharge ?? order.delivery_charge ?? 0
                   );
 
-                  // 🧮 Subtotal calculation
-                  const computedSubtotal = order.items && order.items.length > 0
-                    ? order.items.reduce((acc, item) => acc + (parseFloat(item.price || 0) * parseFloat(item.quantity || item.qty || 1)), 0)
-                    : parseFloat(order.price || 0);
+                  const computedSubtotal =
+                    order.items && order.items.length > 0
+                      ? order.items.reduce(
+                          (acc, item) =>
+                            acc + parseFloat(item.price || 0) * parseFloat(item.quantity || item.qty || 1),
+                          0
+                        )
+                      : parseFloat(order.price || 0);
 
-                  const subtotal = computedSubtotal;
-
-                  // 🎯 Percentage (%) Based Discount Calculation
                   const discountAmount = (() => {
                     if (order.items && order.items.length > 0) {
                       return order.items.reduce((acc, item) => {
                         const itemPrice = parseFloat(item.price || 0);
                         const itemQty = parseFloat(item.quantity || item.qty || 1);
                         const itemDiscVal = parseFloat(item.discount || 0);
-                        const type = item.discount_type || item.discountType || order.discount_type || order.discountType || 'percent';
+                        const type =
+                          item.discount_type ||
+                          item.discountType ||
+                          order.discount_type ||
+                          order.discountType ||
+                          'percent';
 
                         if (type === 'percent' || type === 'percentage') {
                           return acc + ((itemPrice * itemDiscVal) / 100) * itemQty;
                         }
-                        return acc + (itemDiscVal * itemQty);
+                        return acc + itemDiscVal * itemQty;
                       }, 0);
                     }
 
@@ -266,14 +228,12 @@ export default function OrderList() {
                     const type = order.discount_type || order.discountType || 'percent';
 
                     if (type === 'percent' || type === 'percentage') {
-                      return (subtotal * orderDiscVal) / 100;
+                      return (computedSubtotal * orderDiscVal) / 100;
                     }
                     return orderDiscVal;
                   })();
 
-                  // Grand Total = Subtotal + Delivery Charge - Discount
-                  const totalPrice = Math.max(0, subtotal + deliveryCharge - discountAmount);
-
+                  const totalPrice = Math.max(0, computedSubtotal + deliveryCharge - discountAmount);
                   const firstName = order.firstName || order.first_name || 'Customer';
                   const lastName = order.lastName || order.last_name || '';
                   const orderId = order.id || order._id;
@@ -294,7 +254,7 @@ export default function OrderList() {
                           {order.phone || 'N/A'}
                         </div>
                       </td>
-                      <td className="px-5 py-4 font-semibold text-text-primary-light dark:text-text-primary-dark">
+                      <td className="px-5 py-4 font-semibold text-text-primary-light dark:text-text-primary-dark font-mono">
                         ৳{totalPrice.toLocaleString('en-BD')}
                         {discountAmount > 0 && (
                           <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
@@ -316,33 +276,12 @@ export default function OrderList() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right space-x-1">
-                        {/* 👁️ View Details Option */}
-                        <Link
-                          to={`/orders/${orderId}`}
+                        <button
+                          onClick={() => handleOpenModal(order)}
                           className="inline-flex p-1.5 rounded-md hover:bg-background-light dark:hover:bg-background-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-accent-brand transition-colors"
                           title="View Details"
                         >
                           <Eye size={18} />
-                        </Link>
-
-                        {/* ✏️ Edit Order Option (Opens Modal) */}
-                        <button
-                          type="button"
-                          onClick={() => handleEditClick(order)}
-                          className="inline-flex p-1.5 rounded-md hover:bg-background-light dark:hover:bg-background-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-amber-500 transition-colors"
-                          title="Edit Order"
-                        >
-                          <Edit size={18} />
-                        </button>
-
-                        {/* 🗑️ Delete Order Option (Triggers Custom Modal) */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDeleteModal(orderId)}
-                          className="inline-flex p-1.5 rounded-md hover:bg-rose-500/10 text-rose-500 transition-colors"
-                          title="Delete Order"
-                        >
-                          <Trash2 size={18} />
                         </button>
                       </td>
                     </tr>
@@ -353,7 +292,7 @@ export default function OrderList() {
           </div>
         )}
 
-        {/* 📄 Pagination Footer */}
+        {/* Pagination Footer */}
         {pagination && pagination.totalPages > 1 && (
           <div className="p-4 border-t border-border-light dark:border-border-dark flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary-light dark:text-text-secondary-dark">
             <div>
@@ -383,54 +322,12 @@ export default function OrderList() {
         )}
       </div>
 
-      {/* 🔴 Edit Order Modal Component */}
-      <EditOrderModal
-        isOpen={isEditModalOpen}
-        onClose={handleCloseModal}
+      {/* Order Details Modal Component */}
+      <OrderDetailsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         order={selectedOrder}
       />
-
-      {/* 🗑️ Custom Delete Confirmation Modal */}
-      {deleteModal.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-6 rounded-2xl shadow-xl max-w-sm w-full space-y-4 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center gap-3 text-rose-500">
-              <div className="p-3 rounded-full bg-rose-500/10">
-                <AlertCircle size={24} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-                  Delete Order
-                </h3>
-                <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">
-                  This action cannot be undone
-                </p>
-              </div>
-            </div>
-
-            <p className="text-sm text-text-primary-light dark:text-text-primary-dark">
-              Are you sure you want to delete <span className="font-mono font-bold text-accent-brand">Order #{deleteModal.id}</span>?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleCloseDeleteModal}
-                className="px-4 py-2 text-xs font-medium rounded-lg border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-text-primary-light dark:text-text-primary-dark transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-all shadow-sm"
-              >
-                Delete Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
