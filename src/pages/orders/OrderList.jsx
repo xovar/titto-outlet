@@ -278,7 +278,7 @@ export default function OrderList() {
                       <td className="px-5 py-4 text-right space-x-1">
                         <button
                           onClick={() => handleOpenModal(order)}
-                          className="inline-flex p-1.5 rounded-md hover:bg-background-light dark:hover:bg-background-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-accent-brand transition-colors"
+                          className="inline-flex cursor-pointer p-1.5 rounded-md hover:bg-background-light dark:hover:bg-background-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-accent-brand transition-colors"
                           title="View Details"
                         >
                           <Eye size={18} />
