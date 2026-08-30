@@ -14,14 +14,13 @@ import {
   Phone,
   Barcode,
   Loader2,
+  Printer,
 } from 'lucide-react';
 
 export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStatus }) {
-  // প্রতিটি প্রোডাক্ট আইটেমের SKU স্টেট ধরে রাখার জন্য
   const [skus, setSkus] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // মোডাল ওপেন হলে কারেন্ট SKU গুলো লোড করা
   useEffect(() => {
     if (order && order.items) {
       const initialSkus = {};
@@ -33,7 +32,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
     }
   }, [order]);
 
-  // ESC Key এবং Scroll Lock
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -52,7 +50,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
 
   if (!isOpen || !order) return null;
 
-  // Input change handler for SKU
+  const isAlreadyDelivered = order.status?.toLowerCase() === 'delivered';
+
   const handleSkuChange = (itemId, value) => {
     setSkus((prev) => ({
       ...prev,
@@ -60,11 +59,203 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
     }));
   };
 
-  // Deliver and Update SKU Handler
+  // ইনভয়েস প্রিন্ট করার জন্য হেলপার ফাংশন (ছবি অনুযায়ী হুবহু ডিজাইন)
+  const printInvoice = (updatedOrder, updatedSkus) => {
+    const orderId = updatedOrder.id || updatedOrder._id || updatedOrder.order_id;
+    const firstName = updatedOrder.firstName || updatedOrder.first_name || '';
+    const lastName = updatedOrder.lastName || updatedOrder.last_name || '';
+    const deliveryCharge = parseFloat(updatedOrder.deliveryCharge ?? updatedOrder.delivery_charge ?? 0);
+
+    const computedSubtotal =
+      updatedOrder.items && updatedOrder.items.length > 0
+        ? updatedOrder.items.reduce(
+            (acc, item) => acc + parseFloat(item.price || 0) * parseFloat(item.quantity || item.qty || 1),
+            0
+          )
+        : parseFloat(updatedOrder.price || 0);
+
+    const discountAmount = (() => {
+      if (updatedOrder.items && updatedOrder.items.length > 0) {
+        return updatedOrder.items.reduce((acc, item) => {
+          const itemPrice = parseFloat(item.price || 0);
+          const itemQty = parseFloat(item.quantity || item.qty || 1);
+          const itemDiscVal = parseFloat(item.discount || 0);
+          const type =
+            item.discount_type || item.discountType || updatedOrder.discount_type || updatedOrder.discountType || 'percent';
+
+          if (type === 'percent' || type === 'percentage') {
+            return acc + ((itemPrice * itemDiscVal) / 100) * itemQty;
+          }
+          return acc + itemDiscVal * itemQty;
+        }, 0);
+      }
+      const orderDiscVal = parseFloat(updatedOrder.discount || 0);
+      const type = updatedOrder.discount_type || updatedOrder.discountType || 'percent';
+      if (type === 'percent' || type === 'percentage') {
+        return (computedSubtotal * orderDiscVal) / 100;
+      }
+      return orderDiscVal;
+    })();
+
+    const totalPrice = Math.max(0, computedSubtotal + deliveryCharge - discountAmount);
+    const orderDate = updatedOrder.createdAt || updatedOrder.created_at
+      ? new Date(updatedOrder.createdAt || updatedOrder.created_at).toLocaleString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : new Date().toLocaleString('en-GB');
+
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(orderId)}`;
+
+    const itemsHtml = (updatedOrder.items || [])
+      .map((item, index) => {
+        const itemId = item.id || item._id || index;
+        const itemSku = updatedSkus[itemId] || item.sku || '';
+        const itemTotal = parseFloat(item.price || 0) * parseFloat(item.quantity || item.qty || 1);
+        return `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 12px 0;">
+              <strong style="font-size: 14px; color: #0f172a;">${item.name || item.product_name || `Product #${item.product_id || item.productId}`}</strong>
+              <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                ${item.color ? `Color: ${item.color}` : ''} ${item.size ? `| Size: ${item.size}` : ''} ${itemSku ? `| SKU: ${itemSku}` : ''}
+              </div>
+            </td>
+            <td style="text-align: center; padding: 12px 0; font-size: 13px;">${item.quantity || item.qty || 1}</td>
+            <td style="text-align: right; padding: 12px 0; font-size: 13px;">৳${parseFloat(item.price || 0).toLocaleString('en-BD')}</td>
+            <td style="text-align: right; padding: 12px 0; font-size: 13px; font-weight: bold;">৳${itemTotal.toLocaleString('en-BD')}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const invoiceWindow = window.open('', '_blank', 'width=800,height=900');
+    invoiceWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice #${orderId}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; margin: 0; padding: 40px; background: #fff; }
+            .invoice-box { max-width: 650px; margin: auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 8px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
+            .logo { font-size: 32px; font-weight: 900; color: #e11d48; font-style: italic; }
+            .logo-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+            .qr-code { width: 85px; height: 85px; border: 1px solid #e2e8f0; padding: 4px; border-radius: 6px; }
+            .details-bar { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 25px; }
+            .customer-info line { margin-bottom: 3px; }
+            .invoice-title-block { text-align: right; }
+            .status-badge { display: inline-block; font-size: 10px; font-weight: bold; border: 1px solid #000; padding: 2px 6px; margin-top: 6px; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th { text-align: left; font-size: 11px; text-transform: uppercase; color: #000; border-bottom: 2px solid #000; padding-bottom: 8px; }
+            th.right { text-align: right; }
+            th.center { text-align: center; }
+            .summary { float: right; width: 220px; font-size: 13px; margin-bottom: 30px; }
+            .summary-row { display: flex; justify-content: space-between; padding: 4px 0; }
+            .grand-total { font-size: 16px; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 6px 0; margin-top: 4px; }
+            .payment-info { clear: both; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 6px; margin-bottom: 60px; font-size: 12px; }
+            .footer-signatures { display: flex; justify-content: space-between; font-size: 11px; color: #475569; border-top: 1px dashed #cbd5e1; pt: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            <div class="header">
+              <div>
+                <div class="logo">Titto</div>
+                <div class="logo-sub">www.titto.com.bd | Support: +880 1831-698522</div>
+              </div>
+              <img src="${qrCodeUrl}" class="qr-code" alt="QR" />
+            </div>
+
+            <div class="details-bar">
+              <div class="customer-info">
+                <div style="font-size: 10px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">INVOICE TO:</div>
+                <div style="margin-top: 4px;"><strong>Name:</strong> ${firstName} ${lastName}</div>
+                <div><strong>Phone:</strong> ${updatedOrder.phone || 'N/A'}</div>
+                <div><strong>Address:</strong> ${updatedOrder.address || updatedOrder.shipping_address || 'N/A'}</div>
+              </div>
+              <div class="invoice-title-block">
+                <div style="font-size: 16px; font-weight: bold;">INVOICE #${orderId}</div>
+                <div style="color: #64748b; margin-top: 4px;">Date: ${orderDate}</div>
+                <div class="status-badge">STATUS: DELIVERED</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>PRODUCT DESCRIPTION</th>
+                  <th class="center">QTY</th>
+                  <th class="right">UNIT PRICE</th>
+                  <th class="right">TOTAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <div class="summary-row">
+                <span>Subtotal:</span>
+                <span>৳${computedSubtotal.toLocaleString('en-BD')}</span>
+              </div>
+              ${
+                discountAmount > 0
+                  ? `<div class="summary-row" style="color: #059669;">
+                      <span>Discount:</span>
+                      <span>-৳${discountAmount.toLocaleString('en-BD')}</span>
+                    </div>`
+                  : ''
+              }
+              <div class="summary-row">
+                <span>Delivery Charge:</span>
+                <span>৳${deliveryCharge.toLocaleString('en-BD')}</span>
+              </div>
+              <div class="summary-row grand-total">
+                <span>Grand Total:</span>
+                <span>৳${totalPrice.toLocaleString('en-BD')}</span>
+              </div>
+            </div>
+
+            <div class="payment-info">
+              <strong style="font-size: 13px;">Payment Information</strong>
+              <div style="margin-top: 6px; color: #64748b;">Payment Method</div>
+              <div><strong>Cash On Delivery (COD)</strong></div>
+            </div>
+
+            <div class="footer-signatures">
+              <div>
+                <div style="border-top: 1px solid #cbd5e1; width: 140px; margin-bottom: 4px;"></div>
+                <strong>Customer Signature</strong>
+                <div style="font-size: 9px; color: #94a3b8;">Received in good condition</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="border-top: 1px solid #cbd5e1; width: 140px; margin-bottom: 4px; margin-left: auto;"></div>
+                <strong>Authorized Authority</strong>
+                <div style="font-size: 9px; color: #94a3b8;">Send In Good Condition</div>
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    invoiceWindow.document.close();
+  };
+
   const handleMarkAsDelivered = async () => {
+    if (isAlreadyDelivered) return;
+
     try {
       setLoading(true);
-      
+
       const payload = {
         orderId: order.id || order._id || order.order_id,
         status: 'delivered',
@@ -79,12 +270,12 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
         }),
       };
 
-      // Parent Component / Redux Thunk Dispatch
       if (onUpdateStatus) {
         await onUpdateStatus(payload);
-      } else {
-        console.log('Submitted Payload:', payload);
       }
+
+      // আপডেট সাকসেসফুল হলে সরাসরি ইনভয়েস জেনারেট করে প্রিন্ট দেওয়া হবে
+      printInvoice(order, skus);
 
       onClose();
     } catch (error) {
@@ -94,7 +285,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
     }
   };
 
-  // Status Badge Helper
   const getStatusBadge = (status) => {
     const statusClasses = {
       pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
@@ -131,7 +321,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
   const lastName = order.lastName || order.last_name || '';
   const deliveryCharge = parseFloat(order.deliveryCharge ?? order.delivery_charge ?? 0);
 
-  // Subtotal & Discount calculations
   const computedSubtotal =
     order.items && order.items.length > 0
       ? order.items.reduce(
@@ -168,14 +357,12 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
   const totalPrice = Math.max(0, computedSubtotal + deliveryCharge - discountAmount);
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      {/* Background Dark Overlay */}
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       <div 
         className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal Box Container */}
       <div 
         className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden z-10 my-auto flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
@@ -201,7 +388,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
 
         {/* Content */}
         <div className="p-6 space-y-5 text-sm overflow-y-auto">
-          {/* Customer & Address Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-1">
               <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
@@ -235,7 +421,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
             </div>
           </div>
 
-          {/* Order Items with SKU Field */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               <Package size={14} /> Order Items
@@ -262,7 +447,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
                         </span>
                       </div>
 
-                      {/* SKU Input Field */}
                       <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60">
                         <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
                           <Barcode size={13} /> SKU:
@@ -270,9 +454,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
                         <input
                           type="text"
                           placeholder="Enter SKU..."
+                          disabled={isAlreadyDelivered}
                           value={skus[itemId] || ''}
                           onChange={(e) => handleSkuChange(itemId, e.target.value)}
-                          className="w-full px-2.5 py-1 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                          className="w-full px-2.5 py-1 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono disabled:opacity-60 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
@@ -284,7 +469,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
             )}
           </div>
 
-          {/* Price Breakdown */}
           <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2 text-xs">
             <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Subtotal</span>
@@ -315,22 +499,41 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
 
         {/* Footer Buttons */}
         <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              Close
+            </button>
+            {isAlreadyDelivered && (
+              <button
+                onClick={() => printInvoice(order, skus)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5"
+              >
+                <Printer size={14} /> Re-print Invoice
+              </button>
+            )}
+          </div>
 
           <button
             onClick={handleMarkAsDelivered}
-            disabled={loading}
-            className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            disabled={loading || isAlreadyDelivered}
+            className={`px-5 py-2 rounded-lg text-xs font-semibold text-white transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+              isAlreadyDelivered
+                ? 'bg-slate-500'
+                : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+            }`}
           >
             {loading ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
                 Updating...
+              </>
+            ) : isAlreadyDelivered ? (
+              <>
+                <CheckCircle2 size={14} />
+                Already Delivered
               </>
             ) : (
               <>
@@ -343,5 +546,5 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onUpdateStat
       </div>
     </div>,
     document.body
-  );
+  );``
 }
