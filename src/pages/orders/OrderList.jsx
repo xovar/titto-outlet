@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchOrders } from '../../store/slices/orderSlice';
+import { fetchOrders, deliverOrderWithSkus } from '../../store/slices/orderSlice';
 import OrderDetailsModal from './OrderDetailsModal';
 import {
   Search,
@@ -63,6 +63,21 @@ export default function OrderList() {
   const handleOpenModal = (order) => {
     setSelectedOrder(order);
     setIsModalOpen(true);
+  };
+
+  // FIX: OrderDetailsModal was previously rendered with no `onUpdateStatus`
+  // prop at all — the modal's "if (onUpdateStatus)" check always fell
+  // through to its console.log-only fallback, so "Mark as Delivered" never
+  // actually called the backend. This wires it to the deliverOrderWithSkus
+  // thunk (PUT /orders/:id/status with { status, items }), and re-throws
+  // on failure so the modal's own catch block (rather than silently
+  // closing) is what runs.
+  const handleUpdateStatus = async (payload) => {
+    const resultAction = await dispatch(deliverOrderWithSkus(payload));
+
+    if (!deliverOrderWithSkus.fulfilled.match(resultAction)) {
+      throw new Error(resultAction.payload || 'Failed to update order status');
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -327,6 +342,7 @@ export default function OrderList() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         order={selectedOrder}
+        onUpdateStatus={handleUpdateStatus}
       />
     </div>
   );

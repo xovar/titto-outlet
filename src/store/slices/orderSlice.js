@@ -70,15 +70,35 @@ export const updateOrderStatus = createAsyncThunk(
   }
 );
 
+// ⚡ Deliver Order with SKUs Thunk
+// FIX: this used to PUT to `/orders/:id/deliver`, which doesn't exist as a
+// route anywhere in orderRoutes.js — the request was 404-ing silently
+// (falling through to app.js's catch-all 404 handler), so neither the
+// status nor any SKU ever reached the backend. The backend's existing
+// `/orders/:id/status` endpoint (updateOrderStatus) now accepts an optional
+// `items` array of { id, sku } and validates + persists each SKU before
+// deducting stock — so this just needs to hit that same endpoint.
+export const deliverOrderWithSkus = createAsyncThunk(
+  'orders/deliverWithSkus',
+  async ({ orderId, status = 'delivered', items }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.put(`/orders/${orderId}/status`, {
+        status,
+        items, // [{ id, sku }, ...] — validated server-side against variant_sizes
+      });
+      return { orderId, status, items, data: response.data };
+    } catch (error) {
+      return rejectWithValue(extractErrorMsg(error, 'Failed to mark order as delivered'));
+    }
+  }
+);
+
 // ⚡ Update Order Outlet Thunk (HTTP Method: PUT)
-// Mirrors updateOrderStatus — a small, single-field control on the Order
-// Details page, separate from the full updateOrder edit form.
 export const updateOrderOutlet = createAsyncThunk(
   'orders/updateOutlet',
   async ({ id, outletId }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.put(`/orders/${id}/outlet`, { outletId });
-      // Backend returns { message, id, outletId, outletName }
       return { id, outletId, outletName: response.data?.outletName, data: response.data };
     } catch (error) {
       return rejectWithValue(extractErrorMsg(error, 'Failed to update order outlet'));
@@ -92,8 +112,6 @@ export const updateOrder = createAsyncThunk(
   async ({ id, ...orderData }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.put(`/orders/${id}`, orderData);
-      // NOTE: response.data is the backend's authoritative result
-      // (it recalculates price from DB, not from client input).
       return { id, updatedData: orderData, response: response.data };
     } catch (error) {
       return rejectWithValue(extractErrorMsg(error, 'Failed to update order details'));
@@ -181,12 +199,8 @@ const orderSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(createOrder.fulfilled, (state, action) => {
+      .addCase(createOrder.fulfilled, (state) => {
         state.loading = false;
-        // Backend only returns { orderId, message, totalAmount } here, not the
-        // full order object, so we can't safely splice a complete order into
-        // `items`. Bump the total so pagination stays roughly in sync, but the
-        // list itself should be refreshed via fetchOrders after this resolves.
         if (state.pagination) {
           state.pagination.total += 1;
         }
@@ -205,13 +219,11 @@ const orderSlice = createSlice({
         state.updating = false;
         const { id, status } = action.payload;
 
-        // List item update
         const index = state.items.findIndex((item) => item.id === id);
         if (index !== -1) {
           state.items[index].status = status;
         }
 
-        // Selected order update (সেফ চেক)
         if (state.selectedOrder) {
           if (state.selectedOrder.id === id) {
             state.selectedOrder.status = status;
@@ -225,6 +237,47 @@ const orderSlice = createSlice({
         state.error = action.payload;
       })
 
+      // ── Deliver Order with SKUs ────────────────────────────
+      .addCase(deliverOrderWithSkus.pending, (state) => {
+        state.updating = true;
+        state.error = null;
+      })
+      .addCase(deliverOrderWithSkus.fulfilled, (state, action) => {
+        state.updating = false;
+        const { orderId, status, items: updatedItems } = action.payload;
+
+        // Helper function for updating items SKU
+        const applySkuUpdates = (order) => {
+          if (!order || !order.items) return;
+          order.status = status;
+          order.items = order.items.map((item, idx) => {
+            const match = updatedItems.find(
+              (uItem) => uItem.id === item.id || uItem.id === item._id || uItem.id === idx
+            );
+            return match ? { ...item, sku: match.sku } : item;
+          });
+        };
+
+        // ১. অর্ডারের লিস্টে আপডেট
+        const index = state.items.findIndex((item) => item.id === orderId);
+        if (index !== -1) {
+          applySkuUpdates(state.items[index]);
+        }
+
+        // ২. সিলেক্টেড অর্ডারে আপডেট
+        if (state.selectedOrder) {
+          if (state.selectedOrder.id === orderId) {
+            applySkuUpdates(state.selectedOrder);
+          } else if (state.selectedOrder.data?.id === orderId) {
+            applySkuUpdates(state.selectedOrder.data);
+          }
+        }
+      })
+      .addCase(deliverOrderWithSkus.rejected, (state, action) => {
+        state.updating = false;
+        state.error = action.payload;
+      })
+
       // ── Update Order Outlet ───────────────────────────────
       .addCase(updateOrderOutlet.pending, (state) => {
         state.updating = true;
@@ -234,14 +287,12 @@ const orderSlice = createSlice({
         state.updating = false;
         const { id, outletId, outletName } = action.payload;
 
-        // List item update
         const index = state.items.findIndex((item) => item.id === id);
         if (index !== -1) {
           state.items[index].outletId = outletId;
           state.items[index].outletName = outletName;
         }
 
-        // Selected order update (সেফ চেক)
         if (state.selectedOrder) {
           if (state.selectedOrder.id === id) {
             state.selectedOrder.outletId = outletId;
@@ -265,15 +316,8 @@ const orderSlice = createSlice({
       .addCase(updateOrder.fulfilled, (state, action) => {
         state.updating = false;
         const { id, updatedData, response } = action.payload;
-
-        // FIX: use the backend's authoritative totalAmount (calculated from
-        // DB prices) instead of recomputing from client-submitted item
-        // prices. Recomputing client-side let a manipulated item.price slip
-        // back into the UI even though the server had already recalculated
-        // the real total.
         const authoritativePrice = response?.totalAmount;
 
-        // ১. অর্ডারের লিস্টে সিঙ্ক
         const index = state.items.findIndex((item) => item.id === id);
         if (index !== -1) {
           state.items[index] = {
@@ -286,7 +330,6 @@ const orderSlice = createSlice({
           };
         }
 
-        // ২. সিলেক্টেড অর্ডারে তথ্য সিঙ্ক
         if (state.selectedOrder) {
           const merged = {
             ...updatedData,
@@ -306,7 +349,6 @@ const orderSlice = createSlice({
 
       // ── Delete Order ──────────────────────────────────────
       .addCase(deleteOrder.pending, (state) => {
-        // FIX: previously missing — UI had no way to show a delete-in-flight state.
         state.deleting = true;
         state.error = null;
       })
@@ -323,8 +365,6 @@ const orderSlice = createSlice({
         }
       })
       .addCase(deleteOrder.rejected, (state, action) => {
-        // FIX: previously missing — a failed delete request never reset
-        // `deleting`/surfaced an error to the UI.
         state.deleting = false;
         state.error = action.payload;
       });
