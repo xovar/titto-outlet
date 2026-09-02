@@ -6,7 +6,8 @@ import orderReducer from "./slices/orderSlice";
 import bannerReducer from "./slices/bannerSlice";
 import outletReducer from "./slices/outletSlice";
 import categoryReducer from "./slices/categorySlice";
-import managerReducer from "./slices/managerSlice"; // 👈 New Import
+import managerReducer from "./slices/managerSlice";
+import customerReducer from "./slices/Customerslice.JS"; // 👈 New Import
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
     banners: bannerReducer,
     outlets: outletReducer,
     categories: categoryReducer,
-    managers: managerReducer, // 👈 Added Manager Reducer
+    managers: managerReducer,
+    customers: customerReducer,
   },
 });
