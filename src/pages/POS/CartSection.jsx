@@ -150,13 +150,10 @@ export default function CartSection({
       });
   };
 
-  // 🔗 কাস্টমার Walk-in এ ফিরিয়ে আনলে (dropdown থেকে ম্যানুয়ালি) selectedCustomer-ও রিসেট
-  const handleCustomerDropdownChange = (e) => {
-    const value = e.target.value;
-    setCustomer(value);
-    if (value === "Walk-in Customer") {
-      setSelectedCustomer(null);
-    }
+  // 🔗 সিলেক্ট করা কাস্টমার সরিয়ে দিলে (✕ বাটন) walk-in state-এ ফিরে যায়
+  const handleRemoveCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomer("Walk-in Customer");
   };
 
   const handlePay = () => {
@@ -217,23 +214,42 @@ export default function CartSection({
   return (
     <div className="w-full lg:w-105 bg-white dark:bg-gray-800 flex flex-col h-full border-l border-gray-200 dark:border-gray-700 shadow-xl relative">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2 mb-3">
-          <select
-            value={customer}
-            onChange={handleCustomerDropdownChange}
-            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium focus:outline-none"
-          >
-            <option value="Walk-in Customer">Walk-in Customer</option>
-            {/* dropdown এর জন্য fetchCustomers() parent থেকে dispatch করে
-                state.customers.items ম্যাপ করো, আগের নোট অনুযায়ী */}
-          </select>
-          <button
-            title="Add Customer"
-            onClick={() => setShowAddCustomer(true)}
-            className="p-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <UserPlus size={18} />
-          </button>
+        <div className="mb-3">
+          {selectedCustomer ? (
+            // ⚡ কাস্টমার সিলেক্ট করা থাকলে নাম + ফোন নাম্বার card আকারে দেখাও,
+            // সাথে একটা ✕ বাটন — চাপলে কাস্টমার রিমুভ হয়ে walk-in-এ ফিরে যায়।
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                  <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                    {selectedCustomer.name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    +88{selectedCustomer.phone}
+                  </p>
+                </div>
+              </div>
+              <button
+                title="কাস্টমার সরাও"
+                onClick={handleRemoveCustomer}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md shrink-0 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            // ⚡ কোনো কাস্টমার সিলেক্ট করা না থাকলে (walk-in) শুধু একটা
+            // "Add Customer" বাটন — কোনো dropdown নেই।
+            <button
+              onClick={() => setShowAddCustomer(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors"
+            >
+              <UserPlus size={16} /> কাস্টমার যোগ করুন
+            </button>
+          )}
         </div>
 
         <div className="flex justify-between items-center text-sm font-medium">
@@ -387,12 +403,12 @@ export default function CartSection({
               <X size={20} />
             </button>
 
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 flex-shrink-0">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 shrink-0">
               <UserPlus size={20} className="text-indigo-600" /> কাস্টমার খুঁজুন
             </h3>
 
             {/* ফোন নাম্বার সার্চ ফিল্ড */}
-            <div className="space-y-1 flex-shrink-0">
+            <div className="space-y-1 shrink-0">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <Phone size={14} /> ফোন নাম্বার
               </label>
@@ -503,7 +519,7 @@ export default function CartSection({
                           <div className="divide-y divide-gray-100 dark:divide-gray-700">
                             {order.items.map((item) => (
                               <div key={item.id} className="flex items-center gap-3 px-3 py-2">
-                                <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-700 overflow-hidden shrink-0 flex items-center justify-center">
                                   {item.image ? (
                                     <img
                                       src={item.image}
@@ -522,7 +538,7 @@ export default function CartSection({
                                     {[item.color, item.size].filter(Boolean).join(" • ")}
                                   </p>
                                 </div>
-                                <div className="text-right flex-shrink-0">
+                                <div className="text-right shrink-0">
                                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                                     ×{item.quantity}
                                   </p>
@@ -578,7 +594,7 @@ export default function CartSection({
 
             <button
               onClick={resetModal}
-              className="mt-4 w-full py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+              className="mt-4 w-full py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
             >
               বাতিল
             </button>
