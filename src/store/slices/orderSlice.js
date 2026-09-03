@@ -16,11 +16,14 @@ export const fetchOrders = createAsyncThunk(
   async (params = {}, { rejectWithValue }) => {
     try {
       const queryParams = typeof params === 'string' ? { status: params } : params;
-      const { page = 1, limit = 10, status } = queryParams;
+      const { page = 1, limit = 10, status, channel } = queryParams;
 
       let url = `/orders?page=${page}&limit=${limit}`;
       if (status && status !== 'all') {
         url += `&status=${status}`;
+      }
+      if (channel && channel !== 'all') {
+        url += `&channel=${channel}`;
       }
 
       const response = await axiosInstance.get(url);
@@ -44,7 +47,7 @@ export const fetchOrderById = createAsyncThunk(
   }
 );
 
-// ⚡ Create Manual Order Thunk
+// ⚡ Create Manual Order Thunk (website checkout — channel: 'online')
 export const createOrder = createAsyncThunk(
   'orders/create',
   async (orderData, { rejectWithValue }) => {
@@ -53,6 +56,22 @@ export const createOrder = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(extractErrorMsg(error, 'Failed to create order'));
+    }
+  }
+);
+
+// ⚡ Create POS Sale Thunk (in-store checkout — channel: 'pos')
+// আলাদা endpoint কারণ এখানে shipping ফিল্ড লাগে না, outlet সাথে সাথেই সেট
+// হয়, আর stock/status/sold-count সব সাথে সাথেই আপডেট হয়ে যায় (ready-made
+// 'delivered' — POS sale মানেই বিক্রি ওই মুহূর্তেই সম্পন্ন)।
+export const createPosOrder = createAsyncThunk(
+  'orders/createPos',
+  async (posOrderData, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post('/orders/pos', posOrderData);
+      return response.data; // { message, orderId, totalAmount }
+    } catch (error) {
+      return rejectWithValue(extractErrorMsg(error, 'Failed to complete sale'));
     }
   }
 );
@@ -148,6 +167,10 @@ const orderSlice = createSlice({
     loading: false,
     updating: false,
     deleting: false,
+    // POS sale placement — আলাদা রাখা হয়েছে যাতে অন্য কোথাও (যেমন orders
+    // লিস্ট পেজ) চলমান `loading` এর সাথে conflict না করে।
+    placingOrder: false,
+    lastPosOrder: null, // শেষ সফল POS sale এর { orderId, totalAmount } — রিসিট দেখাতে কাজে লাগবে
     error: null,
   },
   reducers: {
@@ -156,6 +179,9 @@ const orderSlice = createSlice({
     },
     clearSelectedOrder: (state) => {
       state.selectedOrder = null;
+    },
+    clearLastPosOrder: (state) => {
+      state.lastPosOrder = null;
     },
   },
   extraReducers: (builder) => {
@@ -194,7 +220,7 @@ const orderSlice = createSlice({
         state.error = action.payload;
       })
 
-      // ── Create Order ──────────────────────────────────────
+      // ── Create Order (online) ─────────────────────────────
       .addCase(createOrder.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -207,6 +233,26 @@ const orderSlice = createSlice({
       })
       .addCase(createOrder.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+
+      // ── Create POS Sale ────────────────────────────────────
+      .addCase(createPosOrder.pending, (state) => {
+        state.placingOrder = true;
+        state.error = null;
+      })
+      .addCase(createPosOrder.fulfilled, (state, action) => {
+        state.placingOrder = false;
+        state.lastPosOrder = {
+          orderId: action.payload.orderId,
+          totalAmount: action.payload.totalAmount,
+        };
+        if (state.pagination) {
+          state.pagination.total += 1;
+        }
+      })
+      .addCase(createPosOrder.rejected, (state, action) => {
+        state.placingOrder = false;
         state.error = action.payload;
       })
 
@@ -371,5 +417,5 @@ const orderSlice = createSlice({
   },
 });
 
-export const { clearOrderError, clearSelectedOrder } = orderSlice.actions;
+export const { clearOrderError, clearSelectedOrder, clearLastPosOrder } = orderSlice.actions;
 export default orderSlice.reducer;

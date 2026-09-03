@@ -24,7 +24,8 @@ import {
   searchCustomerByPhone,
   createCustomer,
   clearSearchResult,
-} from "../../store/slices/Customerslice.JS"; // পাথটা তোমার আসল ফোল্ডার স্ট্রাকচার অনুযায়ী মিলিয়ে নিও
+} from "../../store/slices/customerSlice";
+import { createPosOrder, clearOrderError } from "../../store/slices/orderSlice";
 
 // অর্ডার স্ট্যাটাস অনুযায়ী badge রঙ
 const STATUS_STYLES = {
@@ -71,14 +72,37 @@ export default function CartSection({
 
   // 🔗 dummy local customers state সরিয়ে redux store থেকে নেওয়া হচ্ছে।
   // searchResult: { found: null|true|false, customer: { ...profile, orders: [...] } }
-  const { searchResult, searching, creating, error } = useSelector(
+  const { searchResult, searching, creating, error: customerError } = useSelector(
     (state) => state.customers
   );
+
+  // 🔗 বিক্রেতা (লগইন করা staff/manager) এর outlet — POS sale সাথে সাথেই
+  // এই outlet-এ ট্যাগ হয়ে stock deduct করবে।
+  // ⚠️ localStorage থেকে সরাসরি পড়া হচ্ছে (Header.jsx-এর মতো), কারণ
+  // Redux auth slice-এ user populate হয় না। এটা temporary fix —
+  // পরে login flow Redux-এ user dispatch করলে state.auth.user থেকে নেওয়া উচিত।
+  const outletId = (() => {
+    try {
+      const savedUser =
+        localStorage.getItem("admin_user") ||
+        localStorage.getItem("pos_manager_user");
+      return savedUser ? JSON.parse(savedUser).outletId : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const { placingOrder, error: orderError } = useSelector((state) => state.orders);
 
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [newName, setNewName] = useState("");
+
+  // 🔗 dropdown-এ শুধু display string (`customer` prop) রাখা হয়, কিন্তু
+  // backend-এ পাঠানোর জন্য আসল customer id/phone দরকার — তাই এখানে আলাদা
+  // করে সিলেক্ট হওয়া কাস্টমারের পুরো অবজেক্টটা রাখা হচ্ছে।
+  const [selectedCustomer, setSelectedCustomer] = useState(null); // { id, name, phone } | null (walk-in)
 
   const resetModal = () => {
     setPhoneInput("");
@@ -95,16 +119,14 @@ export default function CartSection({
       return;
     }
     setPhoneError("");
-
-    // 🔗 backend এখন customer profile-এর সাথে orders[] (প্রতিটার items +
-    // outlet সহ) রিটার্ন করে — searchResult.customer.orders
     dispatch(searchCustomerByPhone(cleanPhone));
   };
 
   const handleSelectExisting = () => {
     if (!searchResult.customer) return;
-    const { name, phone } = searchResult.customer;
+    const { id, name, phone } = searchResult.customer;
     setCustomer(`${name} (+88${phone})`);
+    setSelectedCustomer({ id, name, phone });
     resetModal();
   };
 
@@ -118,12 +140,72 @@ export default function CartSection({
     dispatch(createCustomer({ name: newName.trim(), phone: cleanPhone }))
       .unwrap()
       .then((data) => {
-        const { name, phone } = data.customer;
+        const { id, name, phone } = data.customer;
         setCustomer(`${name} (+88${phone})`);
+        setSelectedCustomer({ id, name, phone });
         resetModal();
       })
       .catch(() => {
         // error state ইতিমধ্যে redux এ সেট হয়ে গেছে, নিচে দেখানো হচ্ছে
+      });
+  };
+
+  // 🔗 কাস্টমার Walk-in এ ফিরিয়ে আনলে (dropdown থেকে ম্যানুয়ালি) selectedCustomer-ও রিসেট
+  const handleCustomerDropdownChange = (e) => {
+    const value = e.target.value;
+    setCustomer(value);
+    if (value === "Walk-in Customer") {
+      setSelectedCustomer(null);
+    }
+  };
+
+  const handlePay = () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+    if (!outletId) {
+      alert("তোমার একাউন্টে কোনো outlet অ্যাসাইন করা নেই — POS sale করতে outlet লাগবে।");
+      return;
+    }
+
+    dispatch(clearOrderError());
+
+    // 🔗 cart এর প্রতিটা আইটেমকে backend-এর প্রত্যাশিত শেপে ম্যাপ করা —
+    // cart item এর ফিল্ড নাম (qty ইত্যাদি) তোমার actual cart state অনুযায়ী
+    // মিলিয়ে নিও, এখানে সবচেয়ে কমন কনভেনশন ধরে নেওয়া হয়েছে।
+    const items = cart.map((item) => ({
+      productId: item.productId || item.id,
+      variantId: item.variantId || null,
+      sku: item.sku || null,
+      name: item.name,
+      category: item.category || null,
+      color: item.color || null,
+      size: item.size || null,
+      price: item.price,
+      quantity: item.qty || item.quantity || 1,
+      discount: item.discount || 0,
+      image: item.image || null,
+    }));
+
+    dispatch(
+      createPosOrder({
+        outletId,
+        customerId: selectedCustomer?.id || null,
+        customerName: selectedCustomer?.name || null,
+        customerPhone: selectedCustomer?.phone || null,
+        paymentMethod,
+        deliveryCharge: 0, // POS sale-এ সাধারণত ডেলিভারি চার্জ থাকে না; থাকলে এখানে actual ভ্যালু বসাও
+        items,
+      })
+    )
+      .unwrap()
+      .then((data) => {
+        alert(`বিক্রি সম্পন্ন হয়েছে! Order ID: ${data.orderId}`);
+        clearCart();
+        setCustomer("Walk-in Customer");
+        setSelectedCustomer(null);
+        handlePrintReceipt?.(); // চাইলে সাথে সাথে রিসিট প্রিন্ট
+      })
+      .catch(() => {
+        // orderError স্টেটে বসে গেছে, নিচে বাটনের কাছে দেখানো হচ্ছে
       });
   };
 
@@ -138,7 +220,7 @@ export default function CartSection({
         <div className="flex items-center gap-2 mb-3">
           <select
             value={customer}
-            onChange={(e) => setCustomer(e.target.value)}
+            onChange={handleCustomerDropdownChange}
             className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium focus:outline-none"
           >
             <option value="Walk-in Customer">Walk-in Customer</option>
@@ -261,6 +343,10 @@ export default function CartSection({
           })}
         </div>
 
+        {orderError && (
+          <p className="text-xs text-red-500 text-center pt-1">{orderError}</p>
+        )}
+
         <div className="grid grid-cols-2 gap-2 pt-2">
           <button
             onClick={handlePrintReceipt}
@@ -269,14 +355,17 @@ export default function CartSection({
             <Printer size={18} /> Print
           </button>
           <button
-            onClick={() => {
-              if (cart.length === 0) return alert("Cart is empty!");
-              alert("Order placed successfully!");
-              clearCart();
-            }}
-            className="flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]"
+            onClick={handlePay}
+            disabled={placingOrder || cart.length === 0}
+            className="flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl transition-all shadow-md active:scale-[0.98]"
           >
-            Pay ৳{grandTotal.toFixed(0)}
+            {placingOrder ? (
+              <>
+                <Loader2 size={18} className="animate-spin" /> প্রসেস হচ্ছে...
+              </>
+            ) : (
+              `Pay ৳${grandTotal.toFixed(0)}`
+            )}
           </button>
         </div>
       </div>
@@ -333,7 +422,7 @@ export default function CartSection({
                 </button>
               </div>
               {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
-              {error && <p className="text-xs text-red-500">{error}</p>}
+              {customerError && <p className="text-xs text-red-500">{customerError}</p>}
             </div>
 
             {/* কাস্টমার পাওয়া গেছে — প্রোফাইল + পুরো purchase history */}
