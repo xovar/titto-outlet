@@ -34,8 +34,12 @@ export default function OrderList() {
   // Redux Store
   const { items, pagination, loading, error } = useSelector((state) => state.orders);
 
+  // 🔗 এই পেজে শুধু website checkout (channel: 'online') থেকে আসা অর্ডার
+  // দেখানো হয় — POS sale (channel: 'pos') এখানে আসবে না। backend-এর
+  // getAllOrders আগে থেকেই `channel` query param সাপোর্ট করে, তাই শুধু
+  // fetchOrders dispatch-এ channel: 'online' পাঠালেই যথেষ্ট।
   useEffect(() => {
-    dispatch(fetchOrders({ page: currentPage, limit: 10, status: currentStatus }));
+    dispatch(fetchOrders({ page: currentPage, limit: 10, status: currentStatus, channel: 'online' }));
   }, [dispatch, currentStatus, currentPage]);
 
   const handlePageChange = (newPage) => {
@@ -169,7 +173,9 @@ export default function OrderList() {
           </div>
 
           <button
-            onClick={() => dispatch(fetchOrders({ page: currentPage, limit: 10, status: currentStatus }))}
+            onClick={() =>
+              dispatch(fetchOrders({ page: currentPage, limit: 10, status: currentStatus, channel: 'online' }))
+            }
             className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-all text-text-secondary-light dark:text-text-secondary-dark w-full sm:w-auto justify-center"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
